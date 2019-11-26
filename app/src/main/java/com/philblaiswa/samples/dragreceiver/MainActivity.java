@@ -8,10 +8,13 @@ import android.Manifest;
 import android.content.ClipData;
 import android.content.pm.PackageManager;
 import android.content.res.AssetFileDescriptor;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.drawable.Drawable;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.OpenableColumns;
 import android.view.DragEvent;
 import android.view.View;
 import android.widget.ArrayAdapter;
@@ -121,9 +124,15 @@ public class MainActivity extends AppCompatActivity {
 
         try {
             for (int i = 0; i < clipData.getItemCount() && i < 2; i++) {
-                ClipData.Item item = clipData.getItemAt(0);
-                AssetFileDescriptor fd = getContentResolver().openAssetFileDescriptor(item.getUri(), "r");
+                ClipData.Item item = clipData.getItemAt(i);
+                Uri uri = item.getUri();
+
+                String displayName = getDisplayName(uri);
+                events.add("Filename: " + displayName);
+                
+                AssetFileDescriptor fd = getContentResolver().openAssetFileDescriptor(uri, "r");
                 events.add("File size: " + fd.getLength());
+
                 Bitmap bitmap = BitmapFactory.decodeStream(fd.createInputStream());
                 images[i].setImageBitmap(bitmap);
             }
@@ -131,5 +140,25 @@ public class MainActivity extends AppCompatActivity {
             events.add("Exception: " + e.getMessage());
         }
         return events;
+    }
+
+    private String getDisplayName(Uri uri) {
+        Cursor cursor = null;
+
+        try {
+            String[] projection = { OpenableColumns.DISPLAY_NAME };
+            cursor = getContentResolver().query(uri, projection, null, null, null);
+            if (cursor != null && cursor.moveToFirst()) { // Should only have one hit
+                return cursor.getString(cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME));
+            }
+        } catch (Exception e) {
+            return e.getMessage();
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+
+        return "No display name";
     }
 }
