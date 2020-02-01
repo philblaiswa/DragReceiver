@@ -68,6 +68,10 @@ public class MainActivity extends AppCompatActivity {
                     case DragEvent.ACTION_DROP:
                         dragEvents.add("===================\nACTION_DROP\n===================");
                         DragAndDropPermissions permissions = requestDragAndDropPermissions(dragEvent);
+                        if (permissions == null) {
+                            dragEvents.add("Could not obtain permissions for drop because no content uris associated or permission could not be granted");
+                            break;
+                        }
                         
                         try {
                             dragEvents.add(ClipDataLogger.getClipData(getContentResolver(), dragEvent.getClipData()));
