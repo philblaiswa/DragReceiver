@@ -15,6 +15,7 @@ import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
+import android.view.DragAndDropPermissions;
 import android.view.DragEvent;
 import android.view.View;
 import android.widget.ArrayAdapter;
@@ -66,15 +67,25 @@ public class MainActivity extends AppCompatActivity {
 
                     case DragEvent.ACTION_DROP:
                         dragEvents.add("===================\nACTION_DROP\n===================");
-                        dragEvents.add(ClipDataLogger.getClipData(getContentResolver(), dragEvent.getClipData()));
-
-                        for (int i = 0; i < images.length; i++) {
-                            images[i].setImageResource(R.mipmap.ic_launcher);
+                        DragAndDropPermissions permissions = requestDragAndDropPermissions(dragEvent);
+                        if (permissions == null) {
+                            dragEvents.add("Could not obtain permissions for drop because no content uris associated or permission could not be granted");
+                            break;
                         }
+                        
+                        try {
+                            dragEvents.add(ClipDataLogger.getClipData(getContentResolver(), dragEvent.getClipData()));
 
-                        if (dragEvent.getClipDescription().hasMimeType("image/jpeg")) {
-                            List<String> events = processImages(dragEvent.getClipData());
-                            dragEvents.addAll(events);
+                            for (int i = 0; i < images.length; i++) {
+                                images[i].setImageResource(R.mipmap.ic_launcher);
+                            }
+                            
+                            if (dragEvent.getClipDescription().hasMimeType("image/jpeg")) {
+                                List<String> events = processImages(dragEvent.getClipData());
+                                dragEvents.addAll(events);
+                            }
+                        } finally {
+                            permissions.release();
                         }
                         break;
 
