@@ -22,11 +22,13 @@ import android.widget.ArrayAdapter;
 import android.widget.ImageView;
 import android.widget.ListView;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
-    private List<String> dragEvents = new ArrayList();
+    private ArrayList dragEvents = new ArrayList();
     private ArrayAdapter dragEventsAdapter;
     private ListView dragEventsListView;
     private ImageView[] images = new ImageView[2];
@@ -76,13 +78,16 @@ public class MainActivity extends AppCompatActivity {
                         try {
                             dragEvents.add(ClipDataLogger.getClipData(getContentResolver(), dragEvent.getClipData()));
 
-                            for (int i = 0; i < images.length; i++) {
-                                images[i].setImageResource(R.mipmap.ic_launcher);
+                            for (ImageView image : images) {
+                                image.setImageResource(R.mipmap.ic_launcher);
                             }
-                            
-                            if (dragEvent.getClipDescription().hasMimeType("image/jpeg")) {
-                                List<String> events = processImages(dragEvent.getClipData());
-                                dragEvents.addAll(events);
+
+                            ClipData clipData = dragEvent.getClipData();
+
+                            dragEvents.addAll(streamContentWithInputStream(clipData));
+
+                            if (dragEvent.getClipDescription().hasMimeType("image/*")) {
+                                dragEvents.addAll(processImagesWithFileDescriptor(dragEvent.getClipData()));
                             }
                         } finally {
                             permissions.release();
@@ -105,21 +110,21 @@ public class MainActivity extends AppCompatActivity {
         images[0] = findViewById(R.id.image1);
         images[1] = findViewById(R.id.image2);
 
-        for (int i = 0; i < images.length; i++) {
-            images[i].setImageResource(R.mipmap.ic_launcher);
+        for (ImageView image : images) {
+            image.setImageResource(R.mipmap.ic_launcher);
         }
 
         dragEvents.add("Drag/Drop listener ready");
-        dragEventsAdapter = new ArrayAdapter<String>(this, R.layout.listview_single_item, dragEvents);
-        dragEventsListView = (ListView) findViewById(R.id.drag_event_list);
+        dragEventsAdapter = new ArrayAdapter<>(this, R.layout.listview_single_item, dragEvents);
+        dragEventsListView = findViewById(R.id.drag_event_list);
         dragEventsListView.setAdapter(dragEventsAdapter);
         notifyDataSetChanged();
     }
 
     private void notifyDataSetChanged() {
         // Keep only last 10 events if there are more than 30
-        if (dragEvents.size() > 50) {
-            dragEvents.subList(0, 9).clear();
+        if (dragEvents.size() > 200) {
+            dragEvents.subList(0, 50).clear();
         }
         dragEventsAdapter.notifyDataSetChanged();
         dragEventsListView.post(new Runnable() {
@@ -130,7 +135,41 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private List<String> processImages(ClipData clipData) {
+    private List<String> streamContentWithInputStream(ClipData clipData) {
+        List<String> events = new ArrayList<>();
+
+        for (int i = 0; i < clipData.getItemCount() && i < 2; i++) {
+            ClipData.Item item = clipData.getItemAt(i);
+            Uri uri = item.getUri();
+
+            if (uri != null) {
+
+                // If the stream hasn't been realized yet by the provider this may return 0 bytes
+                long expectedLength = getContentSize(uri);
+                events.add("Expected file size: " + expectedLength + " bytes");
+
+                try (InputStream stream = getContentResolver().openInputStream(uri)){
+                    byte[] buffer = new byte[1024];
+                    int bytesRead;
+                    long totalBytesRead = 0;
+                    do {
+                        bytesRead = stream.read(buffer);
+                        if (bytesRead >= 0) {
+                            totalBytesRead += bytesRead;
+                            events.add("Read bytes [" + bytesRead + ", " + totalBytesRead +
+                                    ((expectedLength > 0) ? "/" + expectedLength + "]" : ""));
+                        }
+                    } while (bytesRead != -1);
+                } catch (NullPointerException | IOException e) {
+                    events.add("Exception: " + e.getMessage());
+                }
+            }
+        }
+
+        return events;
+    }
+
+    private List<String> processImagesWithFileDescriptor(ClipData clipData) {
         List<String> events = new ArrayList<>();
 
         try {
@@ -171,5 +210,25 @@ public class MainActivity extends AppCompatActivity {
         }
 
         return "No display name";
+    }
+
+    private long getContentSize(Uri uri) {
+        Cursor cursor = null;
+
+        try {
+            String[] projection = { OpenableColumns.SIZE };
+            cursor = getContentResolver().query(uri, projection, null, null, null);
+            if (cursor != null && cursor.moveToFirst()) { // Should only have one hit
+                return cursor.getLong(cursor.getColumnIndex(OpenableColumns.SIZE));
+            }
+        } catch (Exception e) {
+            return -1;
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+
+        return -1;
     }
 }
