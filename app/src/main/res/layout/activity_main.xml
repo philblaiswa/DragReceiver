@@ -21,7 +21,7 @@
         android:layout_marginBottom="5dp">
 
         <LinearLayout
-            android:id="@+id/drag_target"
+            android:id="@+id/drag_target1"
             android:orientation="horizontal"
             android:layout_width="0dp"
             android:layout_weight="1"
@@ -38,6 +38,36 @@
 
         <ImageView
             android:id="@+id/image2"
+            android:layout_width="80sp"
+            android:layout_height="80dp"/>
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:orientation="horizontal"
+        android:gravity="center_horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="5dp">
+
+        <LinearLayout
+            android:id="@+id/drag_target2"
+            android:orientation="horizontal"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="80dp"
+            android:layout_marginEnd="0dp"
+            android:background="@drawable/shape_drag_source" >
+
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/image3"
+            android:layout_width="80sp"
+            android:layout_height="80dp"/>
+
+        <ImageView
+            android:id="@+id/image4"
             android:layout_width="80sp"
             android:layout_height="80dp"/>
 

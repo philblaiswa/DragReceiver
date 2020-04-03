@@ -31,7 +31,7 @@ public class MainActivity extends AppCompatActivity {
     private ArrayList dragEvents = new ArrayList();
     private ArrayAdapter dragEventsAdapter;
     private ListView dragEventsListView;
-    private ImageView[] images = new ImageView[2];
+    private ImageView[] images = new ImageView[4];
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,7 +45,7 @@ public class MainActivity extends AppCompatActivity {
                     101);
         }
 
-        findViewById(R.id.drag_target).setOnDragListener(new View.OnDragListener() {
+        findViewById(R.id.drag_target1).setOnDragListener(new View.OnDragListener() {
             private Drawable dragOverShape = getResources().getDrawable(R.drawable.shape_drag_target);
             private Drawable normalShape = getResources().getDrawable(R.drawable.shape_drag_source);
 
@@ -53,22 +53,22 @@ public class MainActivity extends AppCompatActivity {
             public boolean onDrag(View view, DragEvent dragEvent) {
                 switch (dragEvent.getAction()) {
                     case DragEvent.ACTION_DRAG_STARTED:
-                        dragEvents.add("===================\nACTION_DRAG_STARTED\n===================");
+                        dragEvents.add("===================\nACTION_DRAG_STARTED -- drag target 1\n===================");
                         dragEvents.add(ClipDataLogger.getClipDescription(dragEvent.getClipDescription()));
                         break;
 
                     case DragEvent.ACTION_DRAG_ENTERED:
-                        dragEvents.add("===================\nACTION_DRAG_ENTERED\n===================");
+                        dragEvents.add("===================\nACTION_DRAG_ENTERED -=- drag target 1\n===================");
                         view.setBackground(dragOverShape);
                         break;
 
                     case DragEvent.ACTION_DRAG_EXITED:
-                        dragEvents.add("===================\nACTION_DRAG_EXITED\n===================");
+                        dragEvents.add("===================\nACTION_DRAG_EXITED -- drag target 1\n===================");
                         view.setBackground(normalShape);
                         break;
 
                     case DragEvent.ACTION_DROP:
-                        dragEvents.add("===================\nACTION_DROP\n===================");
+                        dragEvents.add("===================\nACTION_DROP -- drag target 1\n===================");
                         DragAndDropPermissions permissions = requestDragAndDropPermissions(dragEvent);
                         if (permissions == null) {
                             dragEvents.add("Could not obtain permissions for drop because no content uris associated or permission could not be granted");
@@ -78,16 +78,15 @@ public class MainActivity extends AppCompatActivity {
                         try {
                             dragEvents.add(ClipDataLogger.getClipData(getContentResolver(), dragEvent.getClipData()));
 
-                            for (ImageView image : images) {
-                                image.setImageResource(R.mipmap.ic_launcher);
-                            }
+                            images[0].setImageResource(R.mipmap.ic_launcher);
+                            images[1].setImageResource(R.mipmap.ic_launcher);
 
                             ClipData clipData = dragEvent.getClipData();
 
                             dragEvents.addAll(streamContentWithInputStream(clipData));
 
                             if (dragEvent.getClipDescription().hasMimeType("image/*")) {
-                                dragEvents.addAll(processImagesWithFileDescriptor(dragEvent.getClipData()));
+                                dragEvents.addAll(processImagesWithFileDescriptor(dragEvent.getClipData(), images[0], images[1]));
                             }
                         } finally {
                             permissions.release();
@@ -95,7 +94,74 @@ public class MainActivity extends AppCompatActivity {
                         break;
 
                     case DragEvent.ACTION_DRAG_ENDED:
-                        dragEvents.add("===================\nACTION_DRAG_ENDED\n===================");
+                        dragEvents.add("===================\nACTION_DRAG_ENDED-- drag target 2\n===================");
+                        dragEvents.add("Result: " + dragEvent.getResult());
+                        view.setBackground(normalShape);
+                        break;
+                }
+
+                notifyDataSetChanged();
+
+                return true;
+            }
+        });
+
+        findViewById(R.id.drag_target2).setOnDragListener(new View.OnDragListener() {
+            private Drawable dragOverShape = getResources().getDrawable(R.drawable.shape_drag_target);
+            private Drawable normalShape = getResources().getDrawable(R.drawable.shape_drag_source);
+
+            @Override
+            public boolean onDrag(View view, DragEvent dragEvent) {
+                switch (dragEvent.getAction()) {
+                    case DragEvent.ACTION_DRAG_STARTED:
+                        dragEvents.add("===================\nACTION_DRAG_STARTED -- drag target 2\n===================");
+                        dragEvents.add(ClipDataLogger.getClipDescription(dragEvent.getClipDescription()));
+                        if (!dragEvent.getClipDescription().hasMimeType("image/*")) {
+                            dragEvents.add("Clip description DOES NOT contain any images -- returning false");
+                            return false;
+                        } else {
+                            dragEvents.add("Clip description contains at least one image -- returning true");
+                        }
+                        break;
+
+                    case DragEvent.ACTION_DRAG_ENTERED:
+                        dragEvents.add("===================\nACTION_DRAG_ENTERED -- drag target 2\n===================");
+                        view.setBackground(dragOverShape);
+                        break;
+
+                    case DragEvent.ACTION_DRAG_EXITED:
+                        dragEvents.add("===================\nACTION_DRAG_EXITED -- drag target 2\n===================");
+                        view.setBackground(normalShape);
+                        break;
+
+                    case DragEvent.ACTION_DROP:
+                        dragEvents.add("===================\nACTION_DROP -- drag target 2\n===================");
+                        DragAndDropPermissions permissions = requestDragAndDropPermissions(dragEvent);
+                        if (permissions == null) {
+                            dragEvents.add("Could not obtain permissions for drop because no content uris associated or permission could not be granted");
+                            break;
+                        }
+
+                        try {
+                            dragEvents.add(ClipDataLogger.getClipData(getContentResolver(), dragEvent.getClipData()));
+
+                            images[2].setImageResource(R.mipmap.ic_launcher);
+                            images[3].setImageResource(R.mipmap.ic_launcher);
+
+                            ClipData clipData = dragEvent.getClipData();
+
+                            dragEvents.addAll(streamContentWithInputStream(clipData));
+
+                            if (dragEvent.getClipDescription().hasMimeType("image/*")) {
+                                dragEvents.addAll(processImagesWithFileDescriptor(dragEvent.getClipData(), images[2], images[3]));
+                            }
+                        } finally {
+                            permissions.release();
+                        }
+                        break;
+
+                    case DragEvent.ACTION_DRAG_ENDED:
+                        dragEvents.add("===================\nACTION_DRAG_ENDED -- drag target 2\n===================");
                         dragEvents.add("Result: " + dragEvent.getResult());
                         view.setBackground(normalShape);
                         break;
@@ -109,6 +175,8 @@ public class MainActivity extends AppCompatActivity {
 
         images[0] = findViewById(R.id.image1);
         images[1] = findViewById(R.id.image2);
+        images[2] = findViewById(R.id.image3);
+        images[3] = findViewById(R.id.image4);
 
         for (ImageView image : images) {
             image.setImageResource(R.mipmap.ic_launcher);
@@ -156,10 +224,9 @@ public class MainActivity extends AppCompatActivity {
                         bytesRead = stream.read(buffer);
                         if (bytesRead >= 0) {
                             totalBytesRead += bytesRead;
-                            events.add("Read bytes [" + bytesRead + ", " + totalBytesRead +
-                                    ((expectedLength > 0) ? "/" + expectedLength + "]" : ""));
                         }
                     } while (bytesRead != -1);
+                    events.add("Expected file size: " + totalBytesRead + " bytes");
                 } catch (NullPointerException | IOException e) {
                     events.add("Exception: " + e.getMessage());
                 }
@@ -169,8 +236,11 @@ public class MainActivity extends AppCompatActivity {
         return events;
     }
 
-    private List<String> processImagesWithFileDescriptor(ClipData clipData) {
+    private List<String> processImagesWithFileDescriptor(ClipData clipData, ImageView image1, ImageView image2) {
         List<String> events = new ArrayList<>();
+
+        boolean image1Set = false;
+        boolean image2Set = false;
 
         try {
             for (int i = 0; i < clipData.getItemCount() && i < 2; i++) {
@@ -178,13 +248,21 @@ public class MainActivity extends AppCompatActivity {
                 Uri uri = item.getUri();
 
                 String displayName = getDisplayName(uri);
-                events.add("Filename: " + displayName);
-                
                 AssetFileDescriptor fd = getContentResolver().openAssetFileDescriptor(uri, "r");
-                events.add("File size: " + fd.getLength());
+                String mimeType = getContentResolver().getType(uri);
 
-                Bitmap bitmap = BitmapFactory.decodeStream(fd.createInputStream());
-                images[i].setImageBitmap(bitmap);
+                events.add("File: " + displayName + "[" + fd.getLength() + " bytes, " + mimeType);
+
+                if (mimeType.startsWith("image/") && (!image1Set || !image2Set)) {
+                    Bitmap bitmap = BitmapFactory.decodeStream(fd.createInputStream());
+                    if (!image1Set) {
+                        image1.setImageBitmap(bitmap);
+                        image1Set = true;
+                    } else {
+                        image2.setImageBitmap(bitmap);
+                        image2Set = true;
+                    }
+                }
             }
         } catch (Exception e) {
             events.add("Exception: " + e.getMessage());
