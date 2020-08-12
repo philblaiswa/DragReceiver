@@ -7,14 +7,12 @@ import androidx.core.content.ContextCompat;
 import android.Manifest;
 import android.content.ClipData;
 import android.content.pm.PackageManager;
-import android.content.res.AssetFileDescriptor;
 import android.database.Cursor;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
+import android.util.Log;
 import android.view.DragAndDropPermissions;
 import android.view.DragEvent;
 import android.view.View;
@@ -22,12 +20,12 @@ import android.widget.ArrayAdapter;
 import android.widget.ImageView;
 import android.widget.ListView;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements IEventChangeNotifier {
+    private static final String TAG = "MainActivity";
+
     private ArrayList dragEvents = new ArrayList();
     private ArrayAdapter dragEventsAdapter;
     private ListView dragEventsListView;
@@ -78,15 +76,16 @@ public class MainActivity extends AppCompatActivity {
                         try {
                             dragEvents.add(ClipDataLogger.getClipData(getContentResolver(), dragEvent.getClipData()));
 
-                            images[0].setImageResource(R.mipmap.ic_launcher);
-                            images[1].setImageResource(R.mipmap.ic_launcher);
+                            for (ImageView imageView : images) {
+                                imageView.setImageResource(R.mipmap.ic_launcher);
+                            }
 
                             ClipData clipData = dragEvent.getClipData();
 
-                            dragEvents.addAll(streamContentWithInputStream(clipData));
+                            dragEvents.addAll(streamContent(clipData));
 
                             if (dragEvent.getClipDescription().hasMimeType("image/*")) {
-                                dragEvents.addAll(processImagesWithFileDescriptor(dragEvent.getClipData(), images[0], images[1]));
+                                dragEvents.addAll(loadImages(dragEvent.getClipData(), images[0], images[1]));
                             }
                         } finally {
                             permissions.release();
@@ -145,15 +144,16 @@ public class MainActivity extends AppCompatActivity {
                         try {
                             dragEvents.add(ClipDataLogger.getClipData(getContentResolver(), dragEvent.getClipData()));
 
-                            images[2].setImageResource(R.mipmap.ic_launcher);
-                            images[3].setImageResource(R.mipmap.ic_launcher);
+                            for (ImageView imageView : images) {
+                                imageView.setImageResource(R.mipmap.ic_launcher);
+                            }
 
                             ClipData clipData = dragEvent.getClipData();
 
-                            dragEvents.addAll(streamContentWithInputStream(clipData));
+                            dragEvents.addAll(streamContent(clipData));
 
                             if (dragEvent.getClipDescription().hasMimeType("image/*")) {
-                                dragEvents.addAll(processImagesWithFileDescriptor(dragEvent.getClipData(), images[2], images[3]));
+                                dragEvents.addAll(loadImages(dragEvent.getClipData(), images[2], images[3]));
                             }
                         } finally {
                             permissions.release();
@@ -189,7 +189,8 @@ public class MainActivity extends AppCompatActivity {
         notifyDataSetChanged();
     }
 
-    private void notifyDataSetChanged() {
+    @Override
+    public void notifyDataSetChanged() {
         // Keep only last 10 events if there are more than 30
         if (dragEvents.size() > 200) {
             dragEvents.subList(0, 50).clear();
@@ -203,63 +204,47 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private List<String> streamContentWithInputStream(ClipData clipData) {
+    private List<String> streamContent(ClipData clipData) {
+        boolean image1Set = false;
+        boolean image2Set = false;
         List<String> events = new ArrayList<>();
 
         for (int i = 0; i < clipData.getItemCount() && i < 2; i++) {
             ClipData.Item item = clipData.getItemAt(i);
             Uri uri = item.getUri();
-
             if (uri != null) {
+                Log.v(TAG, "Uri: " + uri.toString());
 
                 // If the stream hasn't been realized yet by the provider this may return 0 bytes
                 long expectedLength = getContentSize(uri);
                 events.add("Expected file size: " + expectedLength + " bytes");
+                String mimeType = getContentResolver().getType(uri);
+                events.add("MIME type: " + mimeType);
 
-                try (InputStream stream = getContentResolver().openInputStream(uri)){
-                    byte[] buffer = new byte[1024];
-                    int bytesRead;
-                    long totalBytesRead = 0;
-                    do {
-                        bytesRead = stream.read(buffer);
-                        if (bytesRead >= 0) {
-                            totalBytesRead += bytesRead;
-                        }
-                    } while (bytesRead != -1);
-                    events.add("Expected file size: " + totalBytesRead + " bytes");
-                } catch (NullPointerException | IOException e) {
-                    events.add("Exception: " + e.getMessage());
-                }
+                new StreamContentTask(this.getApplicationContext(), this, uri).execute(this.dragEvents);
             }
         }
 
         return events;
     }
 
-    private List<String> processImagesWithFileDescriptor(ClipData clipData, ImageView image1, ImageView image2) {
+    private List<String> loadImages(ClipData clipData, ImageView image1, ImageView image2) {
         List<String> events = new ArrayList<>();
 
         boolean image1Set = false;
         boolean image2Set = false;
 
         try {
-            for (int i = 0; i < clipData.getItemCount() && i < 2; i++) {
+            for (int i = 0; i < clipData.getItemCount() && i < 2 && (!image1Set || !image2Set); i++) {
                 ClipData.Item item = clipData.getItemAt(i);
                 Uri uri = item.getUri();
-
-                String displayName = getDisplayName(uri);
-                AssetFileDescriptor fd = getContentResolver().openAssetFileDescriptor(uri, "r");
                 String mimeType = getContentResolver().getType(uri);
-
-                events.add("File: " + displayName + "[" + fd.getLength() + " bytes, " + mimeType);
-
                 if (mimeType.startsWith("image/") && (!image1Set || !image2Set)) {
-                    Bitmap bitmap = BitmapFactory.decodeStream(fd.createInputStream());
+                    events.add("Extracting image for " + mimeType);
+                    new DownloadImageTask(this.getApplicationContext(), uri).execute(!image1Set ? image1 : image2);
                     if (!image1Set) {
-                        image1.setImageBitmap(bitmap);
                         image1Set = true;
                     } else {
-                        image2.setImageBitmap(bitmap);
                         image2Set = true;
                     }
                 }
@@ -269,27 +254,6 @@ public class MainActivity extends AppCompatActivity {
         }
         return events;
     }
-
-    private String getDisplayName(Uri uri) {
-        Cursor cursor = null;
-
-        try {
-            String[] projection = { OpenableColumns.DISPLAY_NAME };
-            cursor = getContentResolver().query(uri, projection, null, null, null);
-            if (cursor != null && cursor.moveToFirst()) { // Should only have one hit
-                return cursor.getString(cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME));
-            }
-        } catch (Exception e) {
-            return e.getMessage();
-        } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
-        }
-
-        return "No display name";
-    }
-
     private long getContentSize(Uri uri) {
         Cursor cursor = null;
 
