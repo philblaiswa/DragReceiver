@@ -1,4 +1,4 @@
-package com.philblaiswa.samples.dragreceiver;
+package com.philblaiswa.samples.dragreceiver.download;
 
 import android.content.Context;
 import android.content.res.AssetFileDescriptor;
@@ -9,26 +9,23 @@ import android.os.AsyncTask;
 import android.util.Log;
 import android.widget.ImageView;
 
-import java.io.IOException;
 import java.io.InputStream;
 
-public class DownloadImageTask extends AsyncTask<ImageView, Void, Bitmap> {
+public class DownloadImageTask extends AsyncTask<Uri, Void, Bitmap> {
     private static final String TAG = "DownloadImageTask";
 
     private final Context context;
-    private final Uri uri;
     private ImageView imageView;
 
-    public DownloadImageTask(final Context context, final Uri uri) {
+    public DownloadImageTask(final Context context, final ImageView imageView) {
         this.context = context;
-        this.uri = uri;
+        this.imageView = imageView;
     }
 
     @Override
-    protected Bitmap doInBackground(ImageView... imageViews) {
-        imageView = imageViews[0];
-
-        try (InputStream inputStream = context.getContentResolver().openInputStream(uri)) {
+    protected Bitmap doInBackground(Uri... uris) {
+        Log.i(TAG, "Loading image for " + uris[0].toString());
+        try (InputStream inputStream = context.getContentResolver().openInputStream(uris[0])) {
             return BitmapFactory.decodeStream(inputStream);
         } catch (Exception e) {
             Log.e(TAG, "Exception: " + e.getMessage());
